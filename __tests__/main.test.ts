@@ -1,80 +1,77 @@
-/**
- * Unit tests for the action's main functionality, src/main.ts
- *
- * These should be run as if the action was called from a workflow.
- * Specifically, the inputs listed in `action.yml` should be set as environment
- * variables following the pattern `INPUT_<INPUT_NAME>`.
- */
-
 import * as core from '@actions/core'
-import * as main from '../src/main'
+import * as github from '@actions/github'
+import * as fs from 'fs'
+import { run } from './../src/main'
 
-// Mock the GitHub Actions core library
-const debugMock = jest.spyOn(core, 'debug')
-const getInputMock = jest.spyOn(core, 'getInput')
-const setFailedMock = jest.spyOn(core, 'setFailed')
-const setOutputMock = jest.spyOn(core, 'setOutput')
+jest.mock('@actions/core')
+jest.mock('fs', () => ({
+  promises: {
+    access: jest.fn()
+  },
+  readFileSync: jest.fn()
+}))
 
-// Mock the action's main function
-const runMock = jest.spyOn(main, 'run')
+const readFileSync = fs.readFileSync as jest.MockedFunction<
+  typeof fs.readFileSync
+>
 
-// Other utilities
-const timeRegex = /^\d{2}:\d{2}:\d{2}/
-
-describe('action', () => {
+describe('GitHub Action Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    jest.resetAllMocks()
   })
 
-  it('sets the time output', async () => {
-    // Set the action's inputs as return values from core.getInput()
-    getInputMock.mockImplementation((name: string): string => {
-      switch (name) {
-        case 'milliseconds':
-          return '500'
-        default:
-          return ''
+  it('should pass if groupId is not co.touchlab', async () => {
+    readFileSync.mockReturnValue('GROUP=other')
+
+    await run()
+
+    // Assert that setFailed was not called
+    expect(core.setFailed).not.toHaveBeenCalled()
+  })
+
+  it('should fail if groupId is co.touchlab and repo does not start with touchlab/', async () => {
+    readFileSync.mockReturnValue('GROUP=co.touchlab.abc')
+
+    jest.spyOn(github.context, 'repo', 'get').mockImplementation(() => {
+      return {
+        owner: 'some-owner',
+        repo: 'other/repo'
       }
     })
 
-    await main.run()
-    expect(runMock).toHaveReturned()
+    await run()
 
-    // Verify that all of the core library functions were called correctly
-    expect(debugMock).toHaveBeenNthCalledWith(1, 'Waiting 500 milliseconds ...')
-    expect(debugMock).toHaveBeenNthCalledWith(
-      2,
-      expect.stringMatching(timeRegex)
-    )
-    expect(debugMock).toHaveBeenNthCalledWith(
-      3,
-      expect.stringMatching(timeRegex)
-    )
-    expect(setOutputMock).toHaveBeenNthCalledWith(
-      1,
-      'time',
-      expect.stringMatching(timeRegex)
+    // Assert that setFailed was called with the expected message
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'Cannot publish with touchlab groupId. Change GROUP value in gradle.properties'
     )
   })
 
-  it('sets a failed status', async () => {
-    // Set the action's inputs as return values from core.getInput()
-    getInputMock.mockImplementation((name: string): string => {
-      switch (name) {
-        case 'milliseconds':
-          return 'this is not a number'
-        default:
-          return ''
+  it('should not fail if groupId is co.touchlab and repo starts with touchlab/', async () => {
+    readFileSync.mockReturnValue('GROUP=co.touchlab.xyz')
+
+    jest.spyOn(github.context, 'repo', 'get').mockImplementation(() => {
+      return {
+        owner: 'some-owner',
+        repo: 'touchlab/repo'
       }
     })
 
-    await main.run()
-    expect(runMock).toHaveReturned()
+    await run()
 
-    // Verify that all of the core library functions were called correctly
-    expect(setFailedMock).toHaveBeenNthCalledWith(
-      1,
-      'milliseconds not a number'
-    )
+    // Assert that setFailed was not called
+    expect(core.setFailed).not.toHaveBeenCalled()
+  })
+
+  it('should log an error if an exception occurs', async () => {
+    // Mock an exception
+    readFileSync.mockImplementation(() => {
+      throw new Error('Test error')
+    })
+
+    await run()
+
+    // Assert that core.error was called with the expected message
+    expect(core.error).toHaveBeenCalledWith('Error occurred: Test error')
   })
 })

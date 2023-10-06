@@ -1,5 +1,7 @@
 import * as core from '@actions/core'
-import { wait } from './wait'
+import * as github from '@actions/github'
+import { parse } from 'dot-properties'
+import * as fs from 'fs'
 
 /**
  * The main function for the action.
@@ -7,20 +9,28 @@ import { wait } from './wait'
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
+    // Expect GROUP to be set in gradle.properties
+    const src = fs.readFileSync('gradle.properties', 'utf8')
+    const obj = parse(src)
+    // Expect the harcode key GROUP for now
+    const groupId = obj['GROUP'] as string
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
-
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
-
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+    // We are only interested in failing if groupId is set to co.touchlab
+    if (groupId.startsWith('co.touchlab')) {
+      const repo = github.context.repo.repo
+      // It's okay to have above groupId if org is touchlab
+      // otherwise, fail the workflow
+      if (!repo.startsWith('touchlab/')) {
+        core.setFailed(
+          'Cannot publish with touchlab groupId. Change GROUP value in gradle.properties'
+        )
+        return
+      }
+    }
   } catch (error) {
-    // Fail the workflow run if an error occurs
-    if (error instanceof Error) core.setFailed(error.message)
+    // Log error but don't fail the workflow run
+    if (error instanceof Error) {
+      core.error(`Error occurred: ${error.message}`)
+    }
   }
 }
