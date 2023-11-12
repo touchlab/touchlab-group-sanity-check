@@ -17,6 +17,7 @@ export async function run(): Promise<void> {
 
     // We are only interested in failing if groupId is set to co.touchlab
     if (groupId.startsWith('co.touchlab')) {
+      core.info(`github.context.repo.repo: ${github.context.repo.repo}`)
       const repo = github.context.repo.repo
       // It's okay to have above groupId if org is touchlab
       // otherwise, fail the workflow
