@@ -17,11 +17,10 @@ export async function run(): Promise<void> {
 
     // We are only interested in failing if groupId is set to co.touchlab
     if (groupId.startsWith('co.touchlab')) {
-      core.info(`github.context.repo.owner: ${github.context.repo.owner}`)
-      const repo = github.context.repo.repo
+      const owner = github.context.repo.owner
       // It's okay to have above groupId if org is touchlab
       // otherwise, fail the workflow
-      if (!repo.startsWith('touchlab/')) {
+      if (owner !== 'touchlab') {
         core.setFailed(
           'Cannot publish with touchlab groupId. Change GROUP value in gradle.properties'
         )
