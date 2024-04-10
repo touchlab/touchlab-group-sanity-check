@@ -10112,7 +10112,7 @@ async function run() {
         // Expect the harcode key GROUP for now
         const groupId = obj['GROUP'];
         // We are only interested in failing if groupId is set to co.touchlab
-        if (groupId.startsWith('co.touchlab')) {
+        if (groupId.startsWith('co.touchlab.')) {
             const owner = github.context.repo.owner;
             // It's okay to have above groupId if org is touchlab
             // otherwise, fail the workflow
